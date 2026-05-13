@@ -6,6 +6,7 @@
       "name": "micro-saas-notifications",
       "dependencies": {
         "@elysiajs/cors": "^1.4.2",
+        "@sinclair/typebox": "^0.34.49",
         "elysia": "^1.4.28",
         "elysia-rate-limit": "^4.6.2",
       },
