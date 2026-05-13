@@ -1,6 +1,7 @@
 import type { Channel } from "./types";
 import { stmt } from "../db";
 import { BASE_URL, MAX_FEED_ITEMS, escapeXml } from "../config";
+import { formatNotification } from "../format";
 
 export const rssChannel: Channel = {
   name: "rss",
@@ -18,20 +19,29 @@ export function buildRssFeed(
   const project = stmt.getProjectByDomain.get(domain) as any;
   if (!project) return "";
 
+  const formatConfig = project.format_config
+    ? JSON.parse(project.format_config)
+    : null;
+
   const notifications = stmt.getNotifications.all(
     project.id,
     MAX_FEED_ITEMS
   ) as { payload: string; created_at: string }[];
 
   const items = notifications
-    .map(
-      (n) => `
+    .map((n) => {
+      const { title, description } = formatNotification(
+        n.payload,
+        n.created_at,
+        formatConfig
+      );
+      return `
     <item>
-      <title>Notification</title>
-      <description>${escapeXml(n.payload)}</description>
+      <title>${escapeXml(title)}</title>
+      <description>${escapeXml(description)}</description>
       <pubDate>${new Date(n.created_at + "Z").toUTCString()}</pubDate>
-    </item>`
-    )
+    </item>`;
+    })
     .join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
