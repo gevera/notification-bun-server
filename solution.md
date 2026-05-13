@@ -35,6 +35,10 @@ Authenticated with the admin secret key. Creates a new project for a domain.
 - `feedUrl` — RSS feed URL for this project (subscribe in any RSS reader)
 - `verifyToken` — value to place in `/.well-known/verify.txt` on the domain to prove ownership
 
+### `GET /verify/:uuid` — Verify ownership
+
+Verifies ownership of a project by checking the `verifyToken` against the `/.well-known/verify.txt` file on the domain.
+
 ### `POST /notify` — Send a notification
 
 Called from static websites (client-side JS). Validates Origin header against registered + verified domains, checks rate limit, appends to RSS feed.
