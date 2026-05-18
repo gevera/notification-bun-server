@@ -28,11 +28,28 @@ export function generateUuid(): string {
   return randomUUID();
 }
 
+/** Strip characters illegal in XML 1.0 (Android XmlPullParser rejects these) */
+export function sanitizeXmlChars(str: string): string {
+  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+
 export function escapeXml(str: string): string {
-  return str
+  return sanitizeXmlChars(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+/** RFC 822 pubDate for RSS (FeedFlow / XmlPullParser require a valid date) */
+export function formatRfc822Date(createdAt: string): string {
+  const normalized = createdAt.includes("T")
+    ? createdAt.endsWith("Z")
+      ? createdAt
+      : `${createdAt}Z`
+    : `${createdAt.replace(" ", "T")}Z`;
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return new Date().toUTCString();
+  return d.toUTCString();
 }

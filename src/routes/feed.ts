@@ -10,6 +10,6 @@ export const feedRoute = new Elysia().get("/feed/:uuid", ({ params, set }) => {
   }
 
   const feedUrl = makeFeedUrl(params.uuid);
-  set.headers["Content-Type"] = "application/rss+xml; charset=utf-8";
+  set.headers["content-type"] = "application/rss+xml; charset=utf-8";
   return buildRssFeed(project.domain, feedUrl);
 });

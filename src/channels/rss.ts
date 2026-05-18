@@ -1,12 +1,12 @@
 import type { Channel } from "./types";
 import { stmt } from "../db";
-import { BASE_URL, MAX_FEED_ITEMS, escapeXml } from "../config";
+import {
+  BASE_URL,
+  MAX_FEED_ITEMS,
+  escapeXml,
+  formatRfc822Date,
+} from "../config";
 import { formatNotification } from "../format";
-
-/** Safe CDATA wrapper — splits embedded ]]> sequences */
-function wrapCdata(html: string): string {
-  return html.replace(/\]\]>/g, "]]]]><![CDATA[>");
-}
 
 export const rssChannel: Channel = {
   name: "rss",
@@ -15,6 +15,12 @@ export const rssChannel: Channel = {
     // RSS is pull-based — we just store to DB (already done before calling channels).
     // The feed is generated on-demand in GET /feed/:uuid.
   },
+};
+
+type NotificationRow = {
+  id: number;
+  payload: string;
+  created_at: string;
 };
 
 export function buildRssFeed(
@@ -31,7 +37,7 @@ export function buildRssFeed(
   const notifications = stmt.getNotifications.all(
     project.id,
     MAX_FEED_ITEMS
-  ) as { payload: string; created_at: string }[];
+  ) as NotificationRow[];
 
   const items = notifications
     .map((n) => {
@@ -40,24 +46,34 @@ export function buildRssFeed(
         n.created_at,
         formatConfig
       );
-      const body = wrapCdata(description);
+      const itemUrl = `${feedUrl}#${n.id}`;
+      const pubDate = formatRfc822Date(n.created_at);
+      // Entity-escaped HTML (no CDATA) — strict mobile parsers (FeedFlow / XmlPullParser)
+      const descriptionXml = escapeXml(description);
+
       return `
     <item>
       <title>${escapeXml(title)}</title>
-      <description><![CDATA[${body}]]></description>
-      <content:encoded><![CDATA[${body}]]></content:encoded>
-      <pubDate>${new Date(n.created_at + "Z").toUTCString()}</pubDate>
+      <link>${escapeXml(itemUrl)}</link>
+      <guid isPermaLink="true">${escapeXml(itemUrl)}</guid>
+      <pubDate>${pubDate}</pubDate>
+      <description>${descriptionXml}</description>
     </item>`;
     })
     .join("");
 
+  const lastBuild = formatRfc822Date(
+    notifications[0]?.created_at ?? new Date().toISOString()
+  );
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Notifications for ${escapeXml(domain)}</title>
     <description>Website notification feed</description>
     <link>${escapeXml(feedUrl)}</link>
-    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>${items}
+    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml"/>
+    <lastBuildDate>${lastBuild}</lastBuildDate>${items}
   </channel>
 </rss>`;
 }

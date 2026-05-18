@@ -1,4 +1,4 @@
-import { escapeXml } from "./config";
+import { sanitizeXmlChars } from "./config";
 
 /**
  * Format a raw JSON notification payload into a human-readable string.
@@ -167,8 +167,9 @@ function normalizeTelHref(display: string): string | null {
 
 function formatPhoneLink(display: string): string {
   const tel = normalizeTelHref(display);
-  if (!tel) return escapeXml(display);
-  return `<a href="tel:${escapeXml(tel)}">${escapeXml(display)}</a>`;
+  const safeDisplay = sanitizeXmlChars(display);
+  if (!tel) return safeDisplay;
+  return `<a href="tel:${sanitizeXmlChars(tel)}">${safeDisplay}</a>`;
 }
 
 function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
@@ -179,7 +180,7 @@ function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
   if (isPhoneField(field) && looksLikePhone(display)) {
     return formatPhoneLink(display);
   }
-  return escapeXml(display);
+  return sanitizeXmlChars(display);
 }
 
 /** ISO 8601 UTC timestamp for when the notification was stored (international) */
@@ -196,7 +197,7 @@ function formatCreatedAtIso(createdAt: string): string {
 
 function formatCreatedAtHtml(createdAt: string): string {
   const iso = formatCreatedAtIso(createdAt);
-  return `<time datetime="${escapeXml(iso)}">${escapeXml(iso)}</time>`;
+  return `<time datetime="${iso}">${iso}</time>`;
 }
 
 /** Format date as "HH:MM DD/MM/YYYY" */
@@ -249,7 +250,7 @@ export function formatNotification(
     const value = data[field.key];
     if (value === undefined) continue;
     lines.push(
-      `${escapeXml(field.label)}: ${formatFieldValueHtml(field, value)}`
+      `${sanitizeXmlChars(field.label)}: ${formatFieldValueHtml(field, value)}`
     );
   }
 
