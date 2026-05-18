@@ -182,6 +182,23 @@ function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
   return escapeXml(display);
 }
 
+/** ISO 8601 UTC timestamp for when the notification was stored (international) */
+function formatCreatedAtIso(createdAt: string): string {
+  const normalized = createdAt.includes("T")
+    ? createdAt.endsWith("Z")
+      ? createdAt
+      : `${createdAt}Z`
+    : `${createdAt.replace(" ", "T")}Z`;
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return createdAt;
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function formatCreatedAtHtml(createdAt: string): string {
+  const iso = formatCreatedAtIso(createdAt);
+  return `<time datetime="${escapeXml(iso)}">${escapeXml(iso)}</time>`;
+}
+
 /** Format date as "HH:MM DD/MM/YYYY" */
 function formatDate(raw: string): string {
   const d = parseDate(raw);
@@ -223,18 +240,17 @@ export function formatNotification(
     );
   }
 
-  // HTML description: tel: links for phone fields, <br/> between lines (RSS readers)
+  // HTML description: created-at under title, then fields (RSS readers)
   const lines: string[] = [];
+  if (createdAt) {
+    lines.push(formatCreatedAtHtml(createdAt));
+  }
   for (const field of fields) {
     const value = data[field.key];
     if (value === undefined) continue;
     lines.push(
       `${escapeXml(field.label)}: ${formatFieldValueHtml(field, value)}`
     );
-  }
-
-  if (data.time === undefined && createdAt) {
-    lines.push(`Время: ${escapeXml(formatDate(createdAt + "Z"))}`);
   }
 
   return {

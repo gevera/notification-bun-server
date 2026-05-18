@@ -15,6 +15,7 @@ const app = new Elysia()
     rateLimit({
       max: RATE_LIMIT_MAX,
       duration: RATE_LIMIT_DURATION_MS,
+      skip: (req) => new URL(req.url).pathname.startsWith("/feed/"),
     }),
   )
   .use(

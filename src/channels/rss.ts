@@ -1,12 +1,12 @@
 import type { Channel } from "./types";
 import { stmt } from "../db";
 import { BASE_URL, MAX_FEED_ITEMS, escapeXml } from "../config";
+import { formatNotification } from "../format";
 
 /** Safe CDATA wrapper — splits embedded ]]> sequences */
 function wrapCdata(html: string): string {
   return html.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }
-import { formatNotification } from "../format";
 
 export const rssChannel: Channel = {
   name: "rss",
