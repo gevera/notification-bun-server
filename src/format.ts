@@ -1,3 +1,5 @@
+import { escapeXml } from "./config";
+
 /**
  * Format a raw JSON notification payload into a human-readable string.
  *
@@ -17,7 +19,20 @@
 export interface FieldMapping {
   key: string;
   label: string;
+  /** When "phone", value is rendered as a tap-to-dial tel: link in the RSS feed */
+  type?: "phone" | "text";
 }
+
+const PHONE_FIELD_KEYS = new Set([
+  "telephone",
+  "phone",
+  "tel",
+  "mobile",
+  "cellphone",
+  "cell",
+  "phonenumber",
+  "phone_number",
+]);
 
 export interface FormatConfig {
   title_template?: string;
@@ -65,10 +80,15 @@ export function sanitizeFormatConfig(raw: unknown): FormatConfig | null {
       if (typeof f.key !== "string" || typeof f.label !== "string") return null;
       if (f.key.length > MAX_FIELD_KEY_LEN) return null;
       if (f.label.length > MAX_FIELD_LABEL_LEN) return null;
-      fields.push({
+      const entry: FieldMapping = {
         key: stripControlChars(f.key),
         label: stripControlChars(f.label),
-      });
+      };
+      if (f.type !== undefined) {
+        if (f.type !== "phone" && f.type !== "text") return null;
+        entry.type = f.type;
+      }
+      fields.push(entry);
     }
     config.fields = fields;
   }
@@ -119,6 +139,49 @@ function parseDate(raw: string): Date | null {
   return null;
 }
 
+function isPhoneField(field: FieldMapping): boolean {
+  if (field.type === "phone") return true;
+  if (field.type === "text") return false;
+  return PHONE_FIELD_KEYS.has(field.key.toLowerCase());
+}
+
+function digitCount(value: string): number {
+  return (value.match(/\d/g) ?? []).length;
+}
+
+function looksLikePhone(value: string): boolean {
+  return digitCount(value) >= 7;
+}
+
+/** E.164-style href for tel: links (digits, optional leading +) */
+function normalizeTelHref(display: string): string | null {
+  const trimmed = display.trim();
+  if (!looksLikePhone(trimmed)) return null;
+
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 7) return null;
+
+  return hasPlus ? `+${digits}` : digits;
+}
+
+function formatPhoneLink(display: string): string {
+  const tel = normalizeTelHref(display);
+  if (!tel) return escapeXml(display);
+  return `<a href="tel:${escapeXml(tel)}">${escapeXml(display)}</a>`;
+}
+
+function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
+  const raw =
+    field.key === "time" ? formatDate(String(value)) : String(value);
+  const display = raw.slice(0, MAX_PAYLOAD_VALUE_LEN);
+
+  if (isPhoneField(field) && looksLikePhone(display)) {
+    return formatPhoneLink(display);
+  }
+  return escapeXml(display);
+}
+
 /** Format date as "HH:MM DD/MM/YYYY" */
 function formatDate(raw: string): string {
   const d = parseDate(raw);
@@ -160,25 +223,22 @@ export function formatNotification(
     );
   }
 
-  // Build description lines from configured fields
+  // HTML description: tel: links for phone fields, <br/> between lines (RSS readers)
   const lines: string[] = [];
   for (const field of fields) {
     const value = data[field.key];
     if (value === undefined) continue;
-
-    // Special formatting for time-like fields
-    const strValue =
-      field.key === "time" ? formatDate(String(value)) : String(value);
-    lines.push(`${field.label}: ${strValue}`);
+    lines.push(
+      `${escapeXml(field.label)}: ${formatFieldValueHtml(field, value)}`
+    );
   }
 
-  // Add created_at timestamp if not already in the payload
   if (data.time === undefined && createdAt) {
-    lines.push(`Время: ${formatDate(createdAt + "Z")}`);
+    lines.push(`Время: ${escapeXml(formatDate(createdAt + "Z"))}`);
   }
 
   return {
     title,
-    description: lines.join("\n"),
+    description: lines.join("<br/>"),
   };
 }

@@ -1,6 +1,11 @@
 import type { Channel } from "./types";
 import { stmt } from "../db";
 import { BASE_URL, MAX_FEED_ITEMS, escapeXml } from "../config";
+
+/** Safe CDATA wrapper — splits embedded ]]> sequences */
+function wrapCdata(html: string): string {
+  return html.replace(/\]\]>/g, "]]]]><![CDATA[>");
+}
 import { formatNotification } from "../format";
 
 export const rssChannel: Channel = {
@@ -35,17 +40,19 @@ export function buildRssFeed(
         n.created_at,
         formatConfig
       );
+      const body = wrapCdata(description);
       return `
     <item>
       <title>${escapeXml(title)}</title>
-      <description>${escapeXml(description)}</description>
+      <description><![CDATA[${body}]]></description>
+      <content:encoded><![CDATA[${body}]]></content:encoded>
       <pubDate>${new Date(n.created_at + "Z").toUTCString()}</pubDate>
     </item>`;
     })
     .join("");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Notifications for ${escapeXml(domain)}</title>
     <description>Website notification feed</description>
