@@ -34,9 +34,36 @@ function wrapCdata(text: string): string {
     .join("]]>");
 }
 
+export function makeItemUrl(uuid: string, notificationId: number): string {
+  return `${BASE_URL}/feed/${uuid}/${notificationId}`;
+}
+
+export function buildNotificationHtmlPage(
+  domain: string,
+  title: string,
+  descriptionHtml: string
+): string {
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeXml(title)}</title>
+</head>
+<body>
+  <article>
+    <p class="source">${escapeXml(domain)}</p>
+    <h1>${escapeXml(title)}</h1>
+    <div class="content">${descriptionHtml}</div>
+  </article>
+</body>
+</html>`;
+}
+
 export function buildRssFeed(
   domain: string,
-  feedUrl: string
+  feedUrl: string,
+  projectUuid: string
 ): string {
   const project = stmt.getProjectByDomain.get(domain) as any;
   if (!project) return "";
@@ -57,14 +84,15 @@ export function buildRssFeed(
         n.created_at,
         formatConfig
       );
-      const itemUrl = `${feedUrl}#${n.id}`;
+      const itemUrl = makeItemUrl(projectUuid, n.id);
+      const guid = `${feedUrl}#${n.id}`;
       const pubDate = formatRfc822Date(n.created_at);
 
       return `
     <item>
       <title>${escapeXml(title)}</title>
       <link>${escapeXml(itemUrl)}</link>
-      <guid isPermaLink="true">${escapeXml(itemUrl)}</guid>
+      <guid isPermaLink="true">${escapeXml(guid)}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(descriptionPlain)}</description>
       <content:encoded>${wrapCdata(descriptionHtml)}</content:encoded>
