@@ -41,20 +41,23 @@ export function makeItemUrl(uuid: string, notificationId: number): string {
 export function buildNotificationHtmlPage(
   domain: string,
   title: string,
-  descriptionHtml: string
+  descriptionPlain: string
 ): string {
+  const bodyHtml = escapeXml(descriptionPlain).replace(/\n/g, "<br/>");
+
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="format-detection" content="telephone=yes">
   <title>${escapeXml(title)}</title>
 </head>
 <body>
   <article>
     <p class="source">${escapeXml(domain)}</p>
     <h1>${escapeXml(title)}</h1>
-    <div class="content">${descriptionHtml}</div>
+    <div class="content">${bodyHtml}</div>
   </article>
 </body>
 </html>`;

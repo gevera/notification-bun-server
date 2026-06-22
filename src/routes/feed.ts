@@ -37,14 +37,14 @@ export const feedRoute = new Elysia()
       const formatConfig = project.format_config
         ? JSON.parse(project.format_config)
         : null;
-      const { title, descriptionHtml } = formatNotification(
+      const { title, descriptionPlain } = formatNotification(
         row.payload,
         row.created_at,
         formatConfig
       );
 
       set.headers["content-type"] = "text/html; charset=utf-8";
-      return buildNotificationHtmlPage(project.domain, title, descriptionHtml);
+      return buildNotificationHtmlPage(project.domain, title, descriptionPlain);
     },
     {
       params: t.Object({
