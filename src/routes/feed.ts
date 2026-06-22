@@ -1,5 +1,6 @@
 import { Elysia, t } from "elysia";
 import { stmt } from "../db";
+import { MAX_FEED_ITEMS } from "../config";
 import {
   buildNotificationHtmlPage,
   buildRssFeed,
@@ -17,17 +18,24 @@ export const feedRoute = new Elysia()
         return "Not found";
       }
 
-      const row = stmt.getNotificationByUuidAndId.get(
-        params.uuid,
-        notificationId
-      ) as any;
+      const project = stmt.getProjectByUuid.get(params.uuid) as any;
+      if (!project) {
+        set.status = 404;
+        return "Not found";
+      }
+
+      const notifications = stmt.getNotifications.all(
+        project.id,
+        MAX_FEED_ITEMS
+      ) as Array<{ id: number; payload: string; created_at: string }>;
+      const row = notifications.find((n) => n.id === notificationId);
       if (!row) {
         set.status = 404;
         return "Not found";
       }
 
-      const formatConfig = row.format_config
-        ? JSON.parse(row.format_config)
+      const formatConfig = project.format_config
+        ? JSON.parse(project.format_config)
         : null;
       const { title, descriptionHtml } = formatNotification(
         row.payload,
@@ -36,7 +44,7 @@ export const feedRoute = new Elysia()
       );
 
       set.headers["content-type"] = "text/html; charset=utf-8";
-      return buildNotificationHtmlPage(row.domain, title, descriptionHtml);
+      return buildNotificationHtmlPage(project.domain, title, descriptionHtml);
     },
     {
       params: t.Object({
