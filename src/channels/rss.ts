@@ -23,6 +23,17 @@ type NotificationRow = {
   created_at: string;
 };
 
+/** Wrap text in CDATA, splitting sections if the payload contains ]]> */
+function wrapCdata(text: string): string {
+  if (!text.includes("]]>")) {
+    return `<![CDATA[${text}]]>`;
+  }
+  return text
+    .split("]]>")
+    .map((part) => `<![CDATA[${part}]]>`)
+    .join("]]>");
+}
+
 export function buildRssFeed(
   domain: string,
   feedUrl: string
@@ -41,15 +52,13 @@ export function buildRssFeed(
 
   const items = notifications
     .map((n) => {
-      const { title, description } = formatNotification(
+      const { title, descriptionPlain, descriptionHtml } = formatNotification(
         n.payload,
         n.created_at,
         formatConfig
       );
       const itemUrl = `${feedUrl}#${n.id}`;
       const pubDate = formatRfc822Date(n.created_at);
-      // Entity-escaped HTML (no CDATA) — strict mobile parsers (FeedFlow / XmlPullParser)
-      const descriptionXml = escapeXml(description);
 
       return `
     <item>
@@ -57,7 +66,8 @@ export function buildRssFeed(
       <link>${escapeXml(itemUrl)}</link>
       <guid isPermaLink="true">${escapeXml(itemUrl)}</guid>
       <pubDate>${pubDate}</pubDate>
-      <description>${descriptionXml}</description>
+      <description>${escapeXml(descriptionPlain)}</description>
+      <content:encoded>${wrapCdata(descriptionHtml)}</content:encoded>
     </item>`;
     })
     .join("");
@@ -67,7 +77,7 @@ export function buildRssFeed(
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Notifications for ${escapeXml(domain)}</title>
     <description>Website notification feed</description>

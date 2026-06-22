@@ -172,10 +172,18 @@ function formatPhoneLink(display: string): string {
   return `<a href="tel:${sanitizeXmlChars(tel)}">${safeDisplay}</a>`;
 }
 
-function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
+function formatFieldDisplay(field: FieldMapping, value: unknown): string {
   const raw =
     field.key === "time" ? formatDate(String(value)) : String(value);
-  const display = raw.slice(0, MAX_PAYLOAD_VALUE_LEN);
+  return raw.slice(0, MAX_PAYLOAD_VALUE_LEN);
+}
+
+function formatFieldValuePlain(field: FieldMapping, value: unknown): string {
+  return sanitizeXmlChars(formatFieldDisplay(field, value));
+}
+
+function formatFieldValueHtml(field: FieldMapping, value: unknown): string {
+  const display = formatFieldDisplay(field, value);
 
   if (isPhoneField(field) && looksLikePhone(display)) {
     return formatPhoneLink(display);
@@ -193,6 +201,10 @@ function formatCreatedAtIso(createdAt: string): string {
   const d = new Date(normalized);
   if (isNaN(d.getTime())) return createdAt;
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function formatCreatedAtPlain(createdAt: string): string {
+  return formatCreatedAtIso(createdAt);
 }
 
 function formatCreatedAtHtml(createdAt: string): string {
@@ -219,12 +231,16 @@ export function formatNotification(
   payload: string,
   createdAt: string,
   config: FormatConfig | null
-): { title: string; description: string } {
+): { title: string; descriptionPlain: string; descriptionHtml: string } {
   let data: Record<string, unknown>;
   try {
     data = JSON.parse(payload) as Record<string, unknown>;
   } catch {
-    return { title: "Уведомление", description: payload };
+    return {
+      title: "Уведомление",
+      descriptionPlain: payload,
+      descriptionHtml: sanitizeXmlChars(payload),
+    };
   }
 
   const fields = config?.fields ?? DEFAULT_FIELDS;
@@ -241,21 +257,23 @@ export function formatNotification(
     );
   }
 
-  // HTML description: created-at under title, then fields (RSS readers)
-  const lines: string[] = [];
+  const plainLines: string[] = [];
+  const htmlLines: string[] = [];
   if (createdAt) {
-    lines.push(formatCreatedAtHtml(createdAt));
+    plainLines.push(formatCreatedAtPlain(createdAt));
+    htmlLines.push(formatCreatedAtHtml(createdAt));
   }
   for (const field of fields) {
     const value = data[field.key];
     if (value === undefined) continue;
-    lines.push(
-      `${sanitizeXmlChars(field.label)}: ${formatFieldValueHtml(field, value)}`
-    );
+    const label = sanitizeXmlChars(field.label);
+    plainLines.push(`${label}: ${formatFieldValuePlain(field, value)}`);
+    htmlLines.push(`${label}: ${formatFieldValueHtml(field, value)}`);
   }
 
   return {
     title,
-    description: lines.join("<br/>"),
+    descriptionPlain: plainLines.join("\n"),
+    descriptionHtml: htmlLines.join("<br/>"),
   };
 }
